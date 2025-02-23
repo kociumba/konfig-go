@@ -65,7 +65,7 @@ func main() {
 		AutoLoad:     true,
 		AutoSave:     true,
 		UseCallbacks: true,
-		KonfigPath:   "app_config.json",
+		KonfigPath:   "config.json",
 	})
 	if err != nil {
 		log.Fatalf("Failed to create config manager: %v", err)
