@@ -59,7 +59,7 @@ func NewKonfigManager(opt KonfigOptions) (*KonfigManager, error) {
 
 	if opt.AutoLoad {
 		if err := mngr.Load(); err != nil {
-			return nil, fmt.Errorf("error loading configuration: %v\nMake sure you are not using {AutoLoad true} without a config file already created", err)
+			return nil, fmt.Errorf("automatic configuration loading failed: %v.\nTo resolve this:\n1. Ensure config file exists at '%s'\n2. Disable AutoLoad option\n3. Check file permissions", err, opt.KonfigPath)
 		}
 	}
 
@@ -83,12 +83,12 @@ func (m *KonfigManager) RegisterSection(section KonfigSection) error {
 	}
 
 	if reflect.TypeOf(section).Kind() != reflect.Ptr || reflect.TypeOf(section).Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("section must be a pointer to a struct that implements KonfigSection")
+		return fmt.Errorf("invalid section type: section must be a pointer to a struct that implements KonfigSection. Got: %T", section)
 	}
 
 	sectionName := section.Name()
 	if _, exists := m.sections[sectionName]; exists {
-		return fmt.Errorf("tried to register a section with the same name: Section %s is already registered", sectionName)
+		return fmt.Errorf("section name conflict: '%s' is already registered. Each section must have a unique name", sectionName)
 	}
 
 	m.sections[sectionName] = section
@@ -102,48 +102,121 @@ func (m *KonfigManager) Load() error {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("configuration file not found: %s does not exist, or failed to open", filePath)
+			return fmt.Errorf("configuration file not found: %s does not exist", filePath)
 		}
+		return fmt.Errorf("configuration file can not be read: %s", filePath)
 	}
 
-	// ofc yaml has to be different and returns a map[interface{}]interface{} instead 😭
-	configData := make(map[string]interface{})
-	if len(data) > 0 {
-		if err := fmtHandler.Unmarshal(data, &configData); err != nil {
-			return fmt.Errorf("error unmarshalling configuration data: %v", err)
+	// fuck yaml for being different like this, basically this whole function needs to be duplicated to acomodate yaml
+	var configData interface{}
+	if m.opts.Format == YAML {
+		// YAML needs map[interface{}]interface{}
+		yamlData := make(map[interface{}]interface{})
+		if len(data) > 0 {
+			if err := fmtHandler.Unmarshal(data, &yamlData); err != nil {
+				return fmt.Errorf("error unmarshalling YAML configuration data: %v", err)
+			}
 		}
+		configData = yamlData
+	} else {
+		// JSON and TOML can use map[string]interface{}
+		stringData := make(map[string]interface{})
+		if len(data) > 0 {
+			if err := fmtHandler.Unmarshal(data, &stringData); err != nil {
+				return fmt.Errorf("error unmarshalling configuration data: %v", err)
+			}
+		}
+		configData = stringData
 	}
 
-	for sectionName, section := range m.sections {
-		sectionDataFromConfig, sectionExists := configData[sectionName]
+	// Process sections based on format
+	if m.opts.Format == YAML {
+		yamlConfig := configData.(map[interface{}]interface{})
+		for sectionName, section := range m.sections {
+			var sectionDataFromConfig interface{}
+			var sectionExists bool
 
-		if !sectionExists {
-			fmt.Printf("Section %s not found in configuration file, skipping\n", sectionName)
-			continue
-		} else {
-			sectionImpl, ok := section.(*konfigSectionImpl)
-			if !ok {
-				return fmt.Errorf("registered section %s is not a *konfigSectionImpl, invalid registration", sectionName)
-			}
-			dataStructPtr := sectionImpl.data
-
-			sectionBytes, err := fmtHandler.Marshal(sectionDataFromConfig.(map[string]interface{}))
-			if err != nil {
-				return fmt.Errorf("error marshalling section data into specific data type: %v, err: %v", reflect.TypeOf(dataStructPtr).Name(), err)
+			for k, v := range yamlConfig {
+				if strKey, ok := k.(string); ok && strKey == sectionName {
+					sectionDataFromConfig = v
+					sectionExists = true
+					break
+				}
 			}
 
-			if err := fmtHandler.Unmarshal(sectionBytes, dataStructPtr); err != nil {
-				return fmt.Errorf("error unmarshalling section data into specific data type: %v, err: %v", reflect.TypeOf(dataStructPtr).Name(), err)
+			if !sectionExists {
+				fmt.Printf("Section %s not found in configuration file, skipping\n", sectionName)
+				continue
+			} else {
+				sectionImpl, ok := section.(*konfigSectionImpl)
+				if !ok {
+					return fmt.Errorf("registered section %s is not a *konfigSectionImpl, invalid registration", sectionName)
+				}
+				dataStructPtr := sectionImpl.data
+
+				mapData, ok := sectionDataFromConfig.(map[interface{}]interface{})
+				if !ok {
+					return fmt.Errorf("YAML section data is not map[interface{}]interface{}")
+				}
+
+				sectionBytes, err := fmtHandler.Marshal(mapData)
+				if err != nil {
+					return fmt.Errorf("error marshalling section data into specific data type: %v, err: %v", reflect.TypeOf(dataStructPtr).Name(), err)
+				}
+
+				if err := fmtHandler.Unmarshal(sectionBytes, dataStructPtr); err != nil {
+					return fmt.Errorf("error unmarshalling section data into specific data type: %v, err: %v", reflect.TypeOf(dataStructPtr).Name(), err)
+				}
+			}
+
+			if m.opts.UseCallbacks {
+				if err := section.Validate(); err != nil {
+					return fmt.Errorf("error validating section %s: %v", sectionName, err)
+				}
+
+				if err := section.OnLoad(); err != nil {
+					return fmt.Errorf("error running onload action for section %s: %v", sectionName, err)
+				}
 			}
 		}
+	} else {
+		stringConfig := configData.(map[string]interface{})
+		for sectionName, section := range m.sections {
+			sectionDataFromConfig, sectionExists := stringConfig[sectionName]
 
-		if m.opts.UseCallbacks {
-			if err := section.Validate(); err != nil {
-				return fmt.Errorf("error validating section %s: %v", sectionName, err)
+			if !sectionExists {
+				fmt.Printf("Section %s not found in configuration file, skipping\n", sectionName)
+				continue
+			} else {
+				sectionImpl, ok := section.(*konfigSectionImpl)
+				if !ok {
+					return fmt.Errorf("registered section %s is not a *konfigSectionImpl, invalid registration", sectionName)
+				}
+				dataStructPtr := sectionImpl.data
+
+				mapData, ok := sectionDataFromConfig.(map[string]interface{})
+				if !ok {
+					return fmt.Errorf("%v section data is not map[string]interface{}", m.opts.Format)
+				}
+
+				sectionBytes, err := fmtHandler.Marshal(mapData)
+				if err != nil {
+					return fmt.Errorf("error marshalling section data into specific data type: %v, err: %v", reflect.TypeOf(dataStructPtr).Name(), err)
+				}
+
+				if err := fmtHandler.Unmarshal(sectionBytes, dataStructPtr); err != nil {
+					return fmt.Errorf("error unmarshalling section data into specific data type: %v, err: %v", reflect.TypeOf(dataStructPtr).Name(), err)
+				}
 			}
 
-			if err := section.OnLoad(); err != nil {
-				return fmt.Errorf("error running onload action for section %s: %v", sectionName, err)
+			if m.opts.UseCallbacks {
+				if err := section.Validate(); err != nil {
+					return fmt.Errorf("error validating section %s: %v", sectionName, err)
+				}
+
+				if err := section.OnLoad(); err != nil {
+					return fmt.Errorf("error running onload action for section %s: %v", sectionName, err)
+				}
 			}
 		}
 	}

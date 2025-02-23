@@ -61,11 +61,11 @@ var (
 func main() {
 	// Initialize configuration manager
 	mngr, err := konfig.NewKonfigManager(konfig.KonfigOptions{
-		Format:       konfig.YAML,
+		Format:       konfig.JSON,
 		AutoLoad:     true,
 		AutoSave:     true,
 		UseCallbacks: true,
-		KonfigPath:   "app_config.yaml",
+		KonfigPath:   "app_config.json",
 	})
 	if err != nil {
 		log.Fatalf("Failed to create config manager: %v", err)
