@@ -1,6 +1,6 @@
 # konfig
 
-A simple, configuration management library for Go. Offloads worrying about hooking all configuration into some cental file from you onto konfig.
+A simple, configuration management library for Go. Konfig let's you focus on app logic and design instead of config management.
 
 ## Features
 
