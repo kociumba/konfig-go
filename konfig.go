@@ -95,6 +95,11 @@ func (m *KonfigManager) RegisterSection(section KonfigSection) error {
 	return nil
 }
 
+// simple shorthand for registering new sections directly from structs
+func (m *KonfigManager) AddSimpleSection(sectionName string, data interface{}) error {
+	return m.RegisterSection(NewKonfigSection(data, WithSectionName(func() string { return sectionName })))
+}
+
 func (m *KonfigManager) Load() error {
 	filePath := m.opts.KonfigPath
 	fmtHandler := m.formatHnadler

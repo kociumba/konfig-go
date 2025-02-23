@@ -141,6 +141,9 @@ section := konfig.NewKonfigSection(&myConfig,
     }),
 )
 
+// or use the shorthand for a basic registration
+mngr.AddSimpleSection("my_section", &myConfig)
+
 mngr.RegisterSection(section)
 ```
 
