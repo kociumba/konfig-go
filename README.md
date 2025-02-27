@@ -55,7 +55,6 @@ func main() {
     // Create a configuration manager
     mngr, err := konfig.NewKonfigManager(konfig.KonfigOptions{
         Format:       konfig.JSON,        // Use JSON format
-        AutoLoad:     true,               // Load configs when the manager is created
         AutoSave:     true,               // Save on SIGINT/SIGTERM
         UseCallbacks: true,               // Enable validation callbacks
         KonfigPath:   "config.json",      // Config file path (absolute or relative to wd)
@@ -75,6 +74,10 @@ func main() {
 
     if err := mngr.RegisterSection(section); err != nil {
         log.Fatalf("Failed to register section: %v", err)
+    }
+
+    if err := mngr.Load(); err != nil {
+        log.Fatalf("Failed to load the data from the config file")
     }
 
     // ensure configuration is saved on exit
@@ -100,7 +103,6 @@ The `KonfigOptions` struct provides several options to customize the behavior of
 ```go
 type KonfigOptions struct {
     Format       EncodingFormat // JSON, YAML, or TOML
-    AutoLoad     bool          // Load config automatically on startup
     AutoSave     bool          // Save on program termination
     UseCallbacks bool          // Enable validation/callbacks
     KonfigPath   string        // Path to config file

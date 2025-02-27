@@ -18,11 +18,11 @@ const (
 
 // the options you can pass when creating a new KonfigManager
 type KonfigOptions struct {
-	Format       EncodingFormat // the format to use for the config file, available: JSON, YAML, TOML
-	AutoLoad     bool           // will try to automatically load the data when the manager is created
-	AutoSave     bool           // if true, will save the configuration file on SIGINT and SIGTERM, you still need to defer a call to Save() in your main() function
-	UseCallbacks bool           // whether to call the OnLoad() and Validate() callbacks on each section
-	KonfigPath   string         // the path to the config file, no validation is done on the path, it is up to the user to make sure it is correct
+	Format EncodingFormat // the format to use for the config file, available: JSON, YAML, TOML
+	// AutoLoad     bool           // will try to automatically load the data when the manager is created
+	AutoSave     bool   // if true, will save the configuration file on SIGINT and SIGTERM, you still need to defer a call to Save() in your main() function
+	UseCallbacks bool   // whether to call the OnLoad() and Validate() callbacks on each section
+	KonfigPath   string // the path to the config file, no validation is done on the path, it is up to the user to make sure it is correct
 }
 
 type KonfigManager struct {
@@ -57,11 +57,11 @@ func NewKonfigManager(opt KonfigOptions) (*KonfigManager, error) {
 		formatHnadler: fmtHandler,
 	}
 
-	if opt.AutoLoad {
-		if err := mngr.Load(); err != nil {
-			return nil, fmt.Errorf("automatic configuration loading failed: %v.\nTo resolve this:\n1. Ensure config file exists at '%s'\n2. Disable AutoLoad option\n3. Check file permissions", err, opt.KonfigPath)
-		}
-	}
+	// if opt.AutoLoad {
+	// 	if err := mngr.Load(); err != nil {
+	// 		return nil, fmt.Errorf("automatic configuration loading failed: %v.\nTo resolve this:\n1. Ensure config file exists at '%s'\n2. Disable AutoLoad option\n3. Check file permissions", err, opt.KonfigPath)
+	// 	}
+	// }
 
 	autoSaveChan := make(chan os.Signal, 1)
 

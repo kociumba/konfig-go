@@ -61,8 +61,8 @@ var (
 func main() {
 	// Initialize configuration manager
 	mngr, err := konfig.NewKonfigManager(konfig.KonfigOptions{
-		Format:       konfig.JSON,
-		AutoLoad:     true,
+		Format: konfig.JSON,
+		// AutoLoad:     true,
 		AutoSave:     true,
 		UseCallbacks: true,
 		KonfigPath:   "config.json",

@@ -19,8 +19,8 @@ var (
 
 func main() {
 	mngr, err := konfig.NewKonfigManager(konfig.KonfigOptions{
-		Format:       konfig.TOML,
-		AutoLoad:     false,
+		Format: konfig.TOML,
+		// AutoLoad:     false,
 		AutoSave:     true,
 		UseCallbacks: true,
 		KonfigPath:   "config.toml",
