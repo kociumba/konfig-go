@@ -1,4 +1,4 @@
-module github.com/kociumba/konfig
+module github.com/kociumba/konfig-go
 
 go 1.23.5
 

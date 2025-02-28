@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/k0kubun/pp"
-	"github.com/kociumba/konfig"
+	"github.com/kociumba/konfig-go"
 )
 
 type MyData struct {
